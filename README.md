@@ -1,38 +1,49 @@
 # Veda AI Assistant
 
-A full-stack AI chatbot web application built with **React** and **Flask**, powered by **Groq** (Llama 3.3 70B). Veda AI provides real-time conversations with context retention, conversation history management, and a modern dark-themed responsive interface.
+A full-stack AI chatbot web application built with **React** and **Flask**, powered by **Groq** (Llama 3.3 70B). Features real-time streaming responses, context retention across sessions, conversation history management, and a professional dark-themed responsive interface.
+
+![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-FF6B00?style=for-the-badge&logo=groq&logoColor=white)
 
 ---
 
-## Live Demo
+## Table of Contents
 
-| Page | Preview |
-|------|---------|
-| Welcome Screen | Animated SVG robot with floating animation, gradient background, and "Start Chat" CTA |
-| Chat Interface | Split layout with sidebar + message thread + input area |
-| History | Conversation list with titles, timestamps, and delete actions |
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Folder Structure](#folder-structure)
+- [Getting Started](#getting-started)
+- [How It Works](#how-it-works)
+- [API Documentation](#api-documentation)
+- [Database Schema](#database-schema)
+- [Configuration](#configuration)
+- [Technical Decisions](#technical-decisions)
+- [Future Scope](#future-scope)
 
 ---
 
 ## Features
 
 ### Core
-- **Streaming Responses** — AI tokens stream in real-time for instant feedback
-- **Real-time Chat** — Send messages, get instant AI responses
-- **Context Retention** — Full conversation history is sent to the AI on every message, so it remembers previous context
-- **Auto-titled Conversations** — AI generates a short title for each new conversation automatically
+- **Streaming Responses** — AI tokens arrive in real-time via Server-Sent Events (SSE) for instant feedback
+- **Context Retention** — Full conversation history is sent to the AI on every message, enabling natural multi-turn conversations
+- **Auto-titled Conversations** — AI generates a short, descriptive title for each new conversation automatically
 - **Conversation History** — Browse, resume, and delete past conversations from the sidebar
+- **New Conversation** — Start fresh chats anytime with the "New chat" button
 
 ### UI / UX
-- **Dark Futuristic Theme** — Custom dark color palette with gradient accents
-- **Animated Robot** — SVG robot with breathing and floating animations on the welcome page
-- **Markdown Rendering** — AI responses display with formatted headings, bold, italic, lists, etc.
-- **Code Block Highlighting** — Syntax-highlighted code blocks with one-click copy
-- **Responsive Design** — Works on desktop, tablet, and mobile (sidebar collapses on mobile)
-- **Smooth Animations** — Page transitions, message entrance animations via Framer Motion
-- **Glass Morphism** — Backdrop blur effects on the header bar
-- **Auto-scroll** — Chat automatically scrolls to the latest message
-- **Error Display** — Backend errors shown as dismissible banner above the input
+- **Professional Blue Theme** — Clean navy background with bright blue gradient accents
+- **Suggested Prompts** — Clickable example prompts on the empty chat screen for quick onboarding
+- **Markdown Rendering** — AI responses display with formatted headings, bold, italic, lists, and tables
+- **Code Block Highlighting** — Syntax-highlighted code blocks with language label and one-click copy
+- **Responsive Design** — Works on desktop, tablet, and mobile (sidebar collapses to overlay on mobile)
+- **Smart Auto-scroll** — Chat scrolls to the latest message unless you've scrolled up to read history
+- **Loading Skeletons** — Animated placeholders while conversation list loads
+- **Streaming Indicator** — Animated dots show when AI is generating tokens
+- **Dismissible Error Banners** — Backend errors shown as inline banners above the input area
+- **Keyboard Navigation** — All interactive elements accessible via Tab and Enter
 
 ---
 
@@ -55,7 +66,7 @@ A full-stack AI chatbot web application built with **React** and **Flask**, powe
 |---------|---------|---------|
 | Python | 3.8+ | Runtime |
 | Flask | 3.1 | Web framework |
-| Flask-CORS | 5.0 | Cross-origin request handling |
+| Flask-CORS | 5.0 | Cross-origin resource sharing |
 | Groq SDK | 0.13 | AI inference (Llama 3.3 70B) |
 | python-dotenv | 1.1 | Loads `.env` variables |
 
@@ -72,49 +83,50 @@ A full-stack AI chatbot web application built with **React** and **Flask**, powe
 project/
 │
 ├── backend/
-│   ├── app.py                      # Flask entry point — registers blueprints, CORS, DB init
-│   ├── config.py                   # Loads .env, exposes GROQ_API_KEY and DATABASE_PATH
-│   ├── database.py                 # Creates SQLite tables (conversations, messages)
-│   ├── models.py                   # Conversation and Message CRUD classes
-│   ├── requirements.txt            # Python dependencies
-│   ├── .env                        # API key and port (NOT committed to git)
+│   ├── app.py                    # Flask entry point — registers blueprints, CORS, DB init
+│   ├── config.py                 # Loads .env, exposes GROQ_API_KEY, PORT, DEBUG, MAX_MESSAGE_LENGTH
+│   ├── database.py               # Creates SQLite tables with foreign keys, indexes, PRAGMA
+│   ├── models.py                 # Conversation and Message CRUD with try/finally connection management
+│   ├── requirements.txt          # Python dependencies
+│   ├── .env                      # API key and config (NOT committed to git)
+│   ├── .env.example              # Template for .env setup
 │   ├── routes/
 │   │   ├── __init__.py
-│   │   ├── chat.py                 # POST /api/chat — main chat endpoint
-│   │   └── conversation.py         # GET/POST/DELETE /api/conversations
+│   │   ├── chat.py               # POST /api/chat — chat endpoint with streaming (SSE) support
+│   │   └── conversation.py       # GET/POST/DELETE /api/conversations
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── ai_service.py           # Groq API integration (generate_response, generate_title, streaming)
+│   │   └── ai_service.py         # Groq API: generate_response, generate_title, generate_response_stream
 │   └── utils/
 │       ├── __init__.py
-│       └── helpers.py              # format_conversation_title, validate_message, validate_conversation_id
+│       └── helpers.py            # format_conversation_title, validate_message, validate_conversation_id
 │
 ├── frontend/
 │   ├── public/
 │   │   └── favicon.svg
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── MessageBubble.jsx   # Individual message (user or AI) with markdown + copy
-│   │   │   ├── Sidebar.jsx         # Conversation history list, new chat, delete
-│   │   │   └── RobotAnimation.jsx  # Animated SVG robot for the welcome page
+│   │   │   ├── MessageBubble.jsx # Individual message (user or AI) with markdown, copy, streaming dots
+│   │   │   └── Sidebar.jsx       # Conversation history with loading skeleton, keyboard accessible
 │   │   ├── pages/
-│   │   │   ├── Welcome.jsx         # Landing page with gradient, robot, and CTA
-│   │   │   └── Chat.jsx            # Main chat layout (sidebar + messages + input)
+│   │   │   ├── Welcome.jsx       # Landing page with gradient, icon, suggested prompts, and CTA
+│   │   │   └── Chat.jsx          # Main chat layout (sidebar + messages + streaming input)
 │   │   ├── hooks/
-│   │   │   └── useChat.js          # Input state, send logic, auto-scroll, clipboard
+│   │   │   └── useChat.js        # Input state, streaming send, smart auto-scroll, clipboard
 │   │   ├── context/
-│   │   │   └── ChatContext.jsx     # Global state: messages, conversations, actions
+│   │   │   └── ChatContext.jsx   # Global state: messages, conversations, streaming, actions
 │   │   ├── services/
-│   │   │   └── api.js              # Axios instance hitting /api endpoints
-│   │   ├── App.jsx                 # Router: / → Welcome, /chat → Chat
-│   │   ├── main.jsx                # React DOM entry point
-│   │   └── index.css               # Tailwind directives, scrollbar styles, markdown styles
+│   │   │   └── api.js            # Axios (60s timeout) + fetch streaming client
+│   │   ├── App.jsx               # Router: / → Welcome, /chat → Chat
+│   │   ├── main.jsx              # React DOM entry point
+│   │   └── index.css             # Tailwind directives, Inter font, markdown styles
 │   ├── package.json
-│   ├── vite.config.js              # Dev server proxy: /api → localhost:5000
-│   ├── tailwind.config.js          # Custom primary/dark colors, animations
+│   ├── vite.config.js            # Dev server proxy: /api → localhost:5000
+│   ├── tailwind.config.js        # Custom primary/surface color scales
 │   └── postcss.config.js
 │
-├── database.db                     # SQLite database (created at runtime)
+├── database.db                   # SQLite database (created at runtime)
+├── .gitignore                    # Excludes node_modules, venv, .env, database.db
 └── README.md
 ```
 
@@ -126,12 +138,18 @@ project/
 
 - **Node.js** 18+ and **npm**
 - **Python** 3.8+
-- **Groq API key** — get one free at https://console.groq.com/keys
+- **Groq API key** — get one free at https://console.groq.com/keys (no credit card required)
 
-### 1. Backend Setup
+### 1. Clone the Repository
 
 ```bash
-# Navigate to backend
+git clone https://github.com/pandulavedavyas/chatbot-project-.git
+cd chatbot-project-
+```
+
+### 2. Backend Setup
+
+```bash
 cd backend
 
 # Create virtual environment
@@ -146,9 +164,9 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Create .env file with your API key
-echo GROQ_API_KEY=your_groq_api_key_here > .env
-echo PORT=5000 >> .env
+# Create .env from template and add your API key
+cp .env.example .env
+# Edit .env and set GROQ_API_KEY=your_key_here
 
 # Start the server
 python app.py
@@ -156,10 +174,10 @@ python app.py
 
 Backend runs at **http://localhost:5000**
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 ```bash
-# Navigate to frontend (in a second terminal)
+# Open a second terminal
 cd frontend
 
 # Install dependencies
@@ -171,9 +189,9 @@ npm run dev
 
 Frontend runs at **http://localhost:5173**
 
-### 3. Open
+### 4. Use
 
-Visit **http://localhost:5173** in your browser, click **Start Chat**, and begin talking to Veda AI.
+Visit **http://localhost:5173**, click **Start a new chat**, and begin talking to Veda AI.
 
 ---
 
@@ -182,31 +200,31 @@ Visit **http://localhost:5173** in your browser, click **Start Chat**, and begin
 ### Request Flow
 
 ```
-User types message
+User types message → clicks Send (or presses Enter)
        │
        ▼
-React frontend (POST /api/chat)
+React frontend (POST /api/chat { message, conversation_id, stream: true })
        │
        ▼
-Flask backend receives request
+Flask backend validates input (length, type, conversation existence)
        │
        ▼
 SQLite: saves user message to messages table
        │
        ▼
-SQLite: loads full conversation history
+SQLite: loads full conversation history for this conversation
        │
        ▼
-Groq API (Llama 3.3 70B): generates AI response using full context
+Groq API (Llama 3.3 70B): streams AI response token-by-token via SSE
        │
        ▼
-SQLite: saves AI response to messages table
+Each token → frontend appends to the AI message bubble in real-time
        │
        ▼
-Flask returns { reply, conversation_id } to frontend
+Final token → SQLite saves complete AI response to messages table
        │
        ▼
-React renders AI message with markdown + animation
+Frontend shows streaming indicator → then full rendered markdown response
 ```
 
 ### Context Retention
@@ -215,14 +233,14 @@ On every message, the backend loads **all previous messages** in that conversati
 
 ```
 User: "What is Python?"
-AI:   "Python is a high-level programming language..."
-User: "Now multiply that by 10"
-AI:   "4 × 10 = 40"   ← AI knows "that" refers to 4 (but here it would know Python)
+AI:   "Python is a high-level programming language known for its simplicity..."
+User: "Now write a function in it"
+AI:   [writes a Python function]  ← AI knows "it" refers to Python
 ```
 
 ### Auto-titling
 
-When a new conversation is created (first message, no `conversation_id`), the backend sends the first message to the AI with a prompt to generate a short title (max 50 chars). If title generation fails, the first 50 characters of the user's message are used as a fallback.
+When a new conversation is created (first message, no `conversation_id`), the backend sends the first message to the AI with a prompt to generate a short title (max 50 characters). If title generation fails, the first 50 characters of the user's message are used as a fallback.
 
 ---
 
@@ -232,22 +250,24 @@ All endpoints accept and return JSON. Base URL: `http://localhost:5000`
 
 ### POST /api/chat
 
-Send a message and get an AI response.
+Send a message and get an AI response (supports streaming).
 
 **Request body:**
 ```json
 {
   "message": "What is machine learning?",
-  "conversation_id": 5
+  "conversation_id": 5,
+  "stream": true
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `message` | string | Yes | The user's message |
-| `conversation_id` | integer | No | ID of existing conversation. Omit to create a new one |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `message` | string | Yes | — | The user's message (max 10,000 chars) |
+| `conversation_id` | integer | No | `null` | ID of existing conversation. Omit to create a new one |
+| `stream` | boolean | No | `false` | Set `true` for SSE streaming response |
 
-**Success response (200):**
+**Non-streaming response (200):**
 ```json
 {
   "reply": "Machine learning is a subset of artificial intelligence...",
@@ -255,12 +275,22 @@ Send a message and get an AI response.
 }
 ```
 
+**Streaming response (stream: true):**
+Returns `text/event-stream` with SSE events:
+```
+data: {"token": "Machine", "done": false}
+data: {"token": " learning", "done": false}
+data: {"token": " is", "done": false}
+...
+data: {"token": "", "done": true, "conversation_id": 5}
+```
+
 **Error responses:**
 | Status | Meaning |
 |--------|---------|
-| 400 | Missing or empty `message` field |
+| 400 | Missing/empty `message`, invalid type, or message exceeds 10,000 chars |
 | 404 | `conversation_id` does not exist |
-| 500 | AI service error (invalid key, quota exceeded, etc.) |
+| 500 | AI service error (returned as generic message, details logged server-side) |
 
 ---
 
@@ -332,7 +362,7 @@ Create a new empty conversation.
 
 ### DELETE /api/conversations/:id
 
-Delete a conversation and all its messages.
+Delete a conversation and all its messages (cascade delete).
 
 **Response (200):**
 ```json
@@ -341,28 +371,37 @@ Delete a conversation and all its messages.
 }
 ```
 
+**Error:**
+| Status | Meaning |
+|--------|---------|
+| 404 | Conversation not found |
+
 ---
 
 ## Database Schema
 
-Two tables in SQLite (`database.db`):
+Two tables in SQLite (`database.db`) with foreign key constraints and indexes:
 
 ### conversations
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER | Primary key, auto-increment |
-| `title` | TEXT | Auto-generated conversation title |
-| `created_at` | DATETIME | Timestamp of creation |
-| `updated_at` | DATETIME | Timestamp of last activity |
+| `title` | TEXT NOT NULL | Auto-generated conversation title |
+| `created_at` | TIMESTAMP | Defaults to current timestamp |
+| `updated_at` | TIMESTAMP | Updated on each new message |
+
+**Index:** `idx_conversations_updated` on `updated_at DESC`
 
 ### messages
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | INTEGER | Primary key, auto-increment |
-| `conversation_id` | INTEGER | Foreign key → conversations.id |
-| `role` | TEXT | `"user"` or `"assistant"` |
-| `content` | TEXT | Message body |
-| `timestamp` | DATETIME | When the message was sent |
+| `conversation_id` | INTEGER NOT NULL | Foreign key → `conversations.id` ON DELETE CASCADE |
+| `role` | TEXT NOT NULL | `"user"` or `"assistant"` |
+| `content` | TEXT NOT NULL | Message body |
+| `timestamp` | TIMESTAMP | When the message was sent |
+
+**Index:** `idx_messages_conversation` on `conversation_id`
 
 ---
 
@@ -374,52 +413,81 @@ Two tables in SQLite (`database.db`):
 |----------|----------|---------|-------------|
 | `GROQ_API_KEY` | Yes | — | Your Groq API key from https://console.groq.com/keys |
 | `PORT` | No | `5000` | Port the Flask backend listens on |
-| `FLASK_DEBUG` | No | `true` | Set to `false` in production |
-| `MAX_MESSAGE_LENGTH` | No | `10000` | Maximum characters per message |
+| `FLASK_DEBUG` | No | `true` | Set to `false` in production to disable debug mode |
+| `MAX_MESSAGE_LENGTH` | No | `10000` | Maximum characters allowed per message |
+
+### `.env.example`
+
+A template file is provided at `backend/.env.example`. To set up:
+
+```bash
+# macOS/Linux
+cp backend/.env.example backend/.env
+
+# Windows
+copy backend\.env.example backend\.env
+
+# Then edit backend/.env and add your GROQ_API_KEY
+```
 
 ### Vite Proxy
 
 In `frontend/vite.config.js`, the dev server proxies `/api` requests to `localhost:5000` so no CORS issues arise during development.
-
-### `.env.example`
-
-A template `.env.example` file is provided in the `backend/` directory. Copy it to create your `.env`:
-
-```bash
-cp backend/.env.example backend/.env
-# Then edit backend/.env and add your GROQ_API_KEY
-```
 
 ---
 
 ## Technical Decisions
 
 ### Why Groq?
+
 Groq was chosen over OpenAI, Anthropic, and Google Gemini for three reasons:
-1. **Free tier** — 30 RPM on Llama 3.3 70B with no credit card required
-2. **Speed** — Groq's custom LPU hardware delivers faster inference than traditional GPU providers
-3. **OpenAI-compatible API** — The `groq` Python SDK mirrors OpenAI's interface, making future provider switches trivial
+
+1. **Free tier** — 30 requests per minute on Llama 3.3 70B with no credit card required
+2. **Speed** — Groq's custom LPU (Language Processing Unit) hardware delivers significantly faster inference than traditional GPU providers
+3. **OpenAI-compatible API** — The `groq` Python SDK mirrors OpenAI's interface format, making future provider switches trivial (change one import line)
 
 ### Why SQLite?
-For a single-user educational project, SQLite provides zero-configuration storage with full SQL support. No server process, no connection strings — the database is a single file. The schema uses foreign keys with `ON DELETE CASCADE` and indexed columns for query performance.
+
+For a single-user educational project, SQLite provides zero-configuration storage with full SQL support:
+- No server process to install or manage
+- No connection strings — the database is a single `database.db` file
+- Full foreign key support with `ON DELETE CASCADE` for automatic cleanup
+- Indexed columns for query performance as data grows
 
 ### Why Server-Sent Events (SSE) for streaming?
-SSE was chosen over WebSockets for simplicity. It's unidirectional (server-to-client), works over standard HTTP, requires no special libraries, and reconnects automatically. The Groq SDK's `stream=True` parameter integrates naturally with Flask's `Response` generator pattern.
 
-### System prompt
-The AI uses the system prompt: *"You are Veda, a helpful and intelligent AI assistant. Be concise, clear, and friendly. Format responses using markdown when appropriate."* This gives the chatbot a consistent personality across all conversations.
+SSE was chosen over WebSockets for streaming AI responses:
+- **Simpler** — Unidirectional (server-to-client), works over standard HTTP
+- **No special libraries** — Uses the browser's native `EventSource` / `fetch` API
+- **Natural fit** — The Groq SDK's `stream=True` parameter integrates directly with Flask's `Response` generator pattern
+- **Auto-reconnect** — SSE connections automatically reconnect if dropped
+
+### System Prompt
+
+The AI uses a consistent system prompt across all conversations:
+
+> *"You are Veda, a helpful and intelligent AI assistant. Be concise, clear, and friendly. Format responses using markdown when appropriate."*
+
+This ensures the chatbot maintains a consistent personality while adapting its responses to the conversation context.
+
+### Error Handling Strategy
+
+- **User messages are never silently deleted** — If the AI fails to respond, the user's message stays visible and an error banner appears
+- **Internal errors are not leaked** — The backend logs full exception details server-side but returns generic messages to the client (e.g., "Failed to generate response")
+- **Dangling messages are cleaned up** — If the AI call fails after the user message is saved, the user message is automatically rolled back to prevent orphaned messages that would corrupt context
 
 ---
 
 ## Future Scope
 
-- **User Authentication** — Login/signup for private conversations
+- **User Authentication** — Login/signup for private, per-user conversations
 - **Export Conversations** — Download chat history as PDF or JSON
-- **Voice Input** — Speech-to-text for hands-free use
+- **Voice Input** — Speech-to-text for hands-free interaction
 - **Image Generation** — Generate images via AI on request
-- **Dark / Light Theme Toggle** — User-selectable theme
+- **Dark / Light Theme Toggle** — User-selectable theme preference
 - **Conversation Search** — Full-text search through chat history
 - **Keyboard Shortcuts** — Customizable shortcuts for power users
+- **Multi-language Support** — Interface and AI responses in multiple languages
 
 ---
 
