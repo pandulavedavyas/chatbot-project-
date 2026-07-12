@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import { sendMessage as apiSendMessage, getConversations, getConversation, createConversation as apiCreateConversation, deleteConversation as apiDeleteConversation } from '../services/api';
+import { sendMessage as apiSendMessage, sendMessageStream, getConversations, getConversation, deleteConversation as apiDeleteConversation } from '../services/api';
 
 const ChatContext = createContext();
 
@@ -23,7 +23,7 @@ export const ChatProvider = ({ children }) => {
       const data = await getConversations();
       setConversations(data);
     } catch (err) {
-      setError(err.message);
+      setError('Failed to load conversations');
     }
   }, []);
 
@@ -35,64 +35,104 @@ export const ChatProvider = ({ children }) => {
       setMessages(conversation.messages || []);
       setError(null);
     } catch (err) {
-      setError(err.message);
+      setError('Failed to load conversation');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const startNewConversation = useCallback(async () => {
-    try {
-      setCurrentConversation(null);
-      setMessages([]);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    }
+  const startNewConversation = useCallback(() => {
+    setCurrentConversation(null);
+    setMessages([]);
+    setError(null);
   }, []);
 
   const sendMessage = useCallback(async (message) => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
       setMessages(prev => [...prev, userMessage]);
-      
+
       const response = await apiSendMessage(currentConversation?.id, message);
-      
+
       if (!currentConversation) {
-        const newConversation = { id: response.conversation_id, title: 'New Chat' };
-        setCurrentConversation(newConversation);
+        setCurrentConversation({ id: response.conversation_id, title: 'New Chat' });
         await loadConversations();
       }
-      
+
       const assistantMessage = { role: 'assistant', content: response.reply, timestamp: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       return response;
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.message || 'Something went wrong';
+      const errorMsg = err.response?.data?.error || 'Something went wrong. Please try again.';
       setError(errorMsg);
-      setMessages(prev => prev.slice(0, -1));
       throw err;
     } finally {
       setIsLoading(false);
     }
   }, [currentConversation, loadConversations]);
 
+  const sendMessageWithStream = useCallback(async (message) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
+      setMessages(prev => [...prev, userMessage]);
+
+      let assistantContent = '';
+      const assistantIndex = messages.length + 1;
+
+      setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: new Date().toISOString(), streaming: true }]);
+
+      await sendMessageStream(
+        currentConversation?.id,
+        message,
+        (token) => {
+          assistantContent += token;
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[assistantIndex] = { ...updated[assistantIndex], content: assistantContent };
+            return updated;
+          });
+        },
+        async (conversationId) => {
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[assistantIndex] = { ...updated[assistantIndex], streaming: false };
+            return updated;
+          });
+          if (!currentConversation) {
+            setCurrentConversation({ id: conversationId, title: 'New Chat' });
+            await loadConversations();
+          }
+          setIsLoading(false);
+        },
+        (errorMsg) => {
+          setError(errorMsg);
+          setMessages(prev => prev.slice(0, -1));
+          setIsLoading(false);
+        }
+      );
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Something went wrong. Please try again.';
+      setError(errorMsg);
+    }
+  }, [currentConversation, messages.length, loadConversations]);
+
   const deleteConversation = useCallback(async (conversationId) => {
     try {
       await apiDeleteConversation(conversationId);
-      
       if (currentConversation?.id === conversationId) {
         setCurrentConversation(null);
         setMessages([]);
       }
-      
       await loadConversations();
     } catch (err) {
-      setError(err.message);
+      setError('Failed to delete conversation');
     }
   }, [currentConversation, loadConversations]);
 
@@ -106,6 +146,7 @@ export const ChatProvider = ({ children }) => {
     loadConversation,
     startNewConversation,
     sendMessage,
+    sendMessageWithStream,
     deleteConversation,
     setError,
   };

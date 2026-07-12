@@ -1,7 +1,14 @@
 def format_conversation_title(message, max_length=50):
+    if not message or not message.strip():
+        return "New Chat"
+    message = message.strip()
     if len(message) <= max_length:
         return message
-    return message[:max_length].rsplit(' ', 1)[0] + '...'
+    truncated = message[:max_length]
+    last_space = truncated.rfind(' ')
+    if last_space > 0:
+        return truncated[:last_space] + '...'
+    return truncated + '...'
 
 def validate_message(message):
     if not message or not isinstance(message, str):

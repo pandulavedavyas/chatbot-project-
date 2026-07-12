@@ -2,17 +2,38 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useChatContext } from '../context/ChatContext';
 
 export const useChat = () => {
-  const { messages, isLoading, error, sendMessage, setError } = useChatContext();
+  const { messages, isLoading, error, sendMessage, sendMessageWithStream, setError } = useChatContext();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const isUserAtBottom = useRef(true);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  const checkIfAtBottom = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return true;
+    const threshold = 100;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  }, []);
+
   useEffect(() => {
-    scrollToBottom();
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      isUserAtBottom.current = checkIfAtBottom();
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [checkIfAtBottom]);
+
+  useEffect(() => {
+    if (isUserAtBottom.current) {
+      scrollToBottom();
+    }
   }, [messages, scrollToBottom]);
 
   const handleSend = useCallback(async () => {
@@ -20,13 +41,14 @@ export const useChat = () => {
     if (!trimmedMessage || isLoading) return;
 
     setInputValue('');
-    
+    isUserAtBottom.current = true;
+
     try {
-      await sendMessage(trimmedMessage);
+      await sendMessageWithStream(trimmedMessage);
     } catch (err) {
       console.error('Failed to send message:', err);
     }
-  }, [inputValue, isLoading, sendMessage]);
+  }, [inputValue, isLoading, sendMessageWithStream]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -39,8 +61,7 @@ export const useChat = () => {
     try {
       await navigator.clipboard.writeText(text);
       return true;
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
       return false;
     }
   }, []);
@@ -57,6 +78,7 @@ export const useChat = () => {
     setInputValue,
     messagesEndRef,
     textareaRef,
+    scrollContainerRef,
     handleSend,
     handleKeyDown,
     copyToClipboard,

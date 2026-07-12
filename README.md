@@ -17,6 +17,7 @@ A full-stack AI chatbot web application built with **React** and **Flask**, powe
 ## Features
 
 ### Core
+- **Streaming Responses** — AI tokens stream in real-time for instant feedback
 - **Real-time Chat** — Send messages, get instant AI responses
 - **Context Retention** — Full conversation history is sent to the AI on every message, so it remembers previous context
 - **Auto-titled Conversations** — AI generates a short title for each new conversation automatically
@@ -52,7 +53,7 @@ A full-stack AI chatbot web application built with **React** and **Flask**, powe
 ### Backend
 | Library | Version | Purpose |
 |---------|---------|---------|
-| Python | 3.14 | Runtime |
+| Python | 3.8+ | Runtime |
 | Flask | 3.1 | Web framework |
 | Flask-CORS | 5.0 | Cross-origin request handling |
 | Groq SDK | 0.13 | AI inference (Llama 3.3 70B) |
@@ -83,7 +84,7 @@ project/
 │   │   └── conversation.py         # GET/POST/DELETE /api/conversations
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── gemini_service.py       # Groq API integration (generate_response, generate_title)
+│   │   └── ai_service.py           # Groq API integration (generate_response, generate_title, streaming)
 │   └── utils/
 │       ├── __init__.py
 │       └── helpers.py              # format_conversation_title, validate_message, validate_conversation_id
@@ -373,10 +374,40 @@ Two tables in SQLite (`database.db`):
 |----------|----------|---------|-------------|
 | `GROQ_API_KEY` | Yes | — | Your Groq API key from https://console.groq.com/keys |
 | `PORT` | No | `5000` | Port the Flask backend listens on |
+| `FLASK_DEBUG` | No | `true` | Set to `false` in production |
+| `MAX_MESSAGE_LENGTH` | No | `10000` | Maximum characters per message |
 
 ### Vite Proxy
 
 In `frontend/vite.config.js`, the dev server proxies `/api` requests to `localhost:5000` so no CORS issues arise during development.
+
+### `.env.example`
+
+A template `.env.example` file is provided in the `backend/` directory. Copy it to create your `.env`:
+
+```bash
+cp backend/.env.example backend/.env
+# Then edit backend/.env and add your GROQ_API_KEY
+```
+
+---
+
+## Technical Decisions
+
+### Why Groq?
+Groq was chosen over OpenAI, Anthropic, and Google Gemini for three reasons:
+1. **Free tier** — 30 RPM on Llama 3.3 70B with no credit card required
+2. **Speed** — Groq's custom LPU hardware delivers faster inference than traditional GPU providers
+3. **OpenAI-compatible API** — The `groq` Python SDK mirrors OpenAI's interface, making future provider switches trivial
+
+### Why SQLite?
+For a single-user educational project, SQLite provides zero-configuration storage with full SQL support. No server process, no connection strings — the database is a single file. The schema uses foreign keys with `ON DELETE CASCADE` and indexed columns for query performance.
+
+### Why Server-Sent Events (SSE) for streaming?
+SSE was chosen over WebSockets for simplicity. It's unidirectional (server-to-client), works over standard HTTP, requires no special libraries, and reconnects automatically. The Groq SDK's `stream=True` parameter integrates naturally with Flask's `Response` generator pattern.
+
+### System prompt
+The AI uses the system prompt: *"You are Veda, a helpful and intelligent AI assistant. Be concise, clear, and friendly. Format responses using markdown when appropriate."* This gives the chatbot a consistent personality across all conversations.
 
 ---
 
