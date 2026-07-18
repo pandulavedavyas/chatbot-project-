@@ -1,4 +1,4 @@
-from database import get_db_connection
+from database import get_db_connection, release_conn, _q, _dict_row, _dict_all, USE_POSTGRES
 
 class Conversation:
     @staticmethod
@@ -6,11 +6,16 @@ class Conversation:
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('INSERT INTO conversations (title) VALUES (?)', (title,))
-            conn.commit()
-            return cursor.lastrowid
+            if USE_POSTGRES:
+                cursor.execute(f'INSERT INTO conversations (title) VALUES ({_q(1)}) RETURNING id', (title,))
+                conn.commit()
+                return cursor.fetchone()[0]
+            else:
+                cursor.execute(f'INSERT INTO conversations (title) VALUES ({_q(1)})', (title,))
+                conn.commit()
+                return cursor.lastrowid
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def get_all():
@@ -18,52 +23,51 @@ class Conversation:
         try:
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM conversations ORDER BY updated_at DESC')
-            return [dict(row) for row in cursor.fetchall()]
+            return _dict_all(cursor)
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def get_by_id(conversation_id):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM conversations WHERE id = ?', (conversation_id,))
-            conversation = cursor.fetchone()
-            return dict(conversation) if conversation else None
+            cursor.execute(f'SELECT * FROM conversations WHERE id = {_q(1)}', (conversation_id,))
+            return _dict_row(cursor)
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def update_title(conversation_id, title):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            cursor.execute(f'UPDATE conversations SET title = {_q(1)}, updated_at = CURRENT_TIMESTAMP WHERE id = {_q(1)}',
                           (title, conversation_id))
             conn.commit()
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def update_timestamp(conversation_id):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            cursor.execute(f'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = {_q(1)}',
                           (conversation_id,))
             conn.commit()
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def delete(conversation_id):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM conversations WHERE id = ?', (conversation_id,))
+            cursor.execute(f'DELETE FROM conversations WHERE id = {_q(1)}', (conversation_id,))
             conn.commit()
         finally:
-            conn.close()
+            release_conn(conn)
 
 class Message:
     @staticmethod
@@ -71,25 +75,32 @@ class Message:
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)',
-                          (conversation_id, role, content))
+            if USE_POSTGRES:
+                cursor.execute(f'INSERT INTO messages (conversation_id, role, content) VALUES ({_q(3)}) RETURNING id',
+                              (conversation_id, role, content))
+                conn.commit()
+                msg_id = cursor.fetchone()[0]
+            else:
+                cursor.execute(f'INSERT INTO messages (conversation_id, role, content) VALUES ({_q(3)})',
+                              (conversation_id, role, content))
+                conn.commit()
+                msg_id = cursor.lastrowid
+            cursor.execute(f'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = {_q(1)}', (conversation_id,))
             conn.commit()
-            cursor.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (conversation_id,))
-            conn.commit()
-            return cursor.lastrowid
+            return msg_id
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def get_by_conversation(conversation_id):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp',
+            cursor.execute(f'SELECT * FROM messages WHERE conversation_id = {_q(1)} ORDER BY timestamp',
                           (conversation_id,))
-            return [dict(row) for row in cursor.fetchall()]
+            return _dict_all(cursor)
         finally:
-            conn.close()
+            release_conn(conn)
 
     @staticmethod
     def get_context(conversation_id):
@@ -101,10 +112,16 @@ class Message:
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute(
-                'DELETE FROM messages WHERE id = (SELECT id FROM messages WHERE conversation_id = ? AND role = ? ORDER BY id DESC LIMIT 1)',
-                (conversation_id, 'user')
-            )
+            if USE_POSTGRES:
+                cursor.execute(
+                    'DELETE FROM messages WHERE id = (SELECT id FROM messages WHERE conversation_id = %s AND role = %s ORDER BY id DESC LIMIT 1)',
+                    (conversation_id, 'user')
+                )
+            else:
+                cursor.execute(
+                    'DELETE FROM messages WHERE id = (SELECT id FROM messages WHERE conversation_id = ? AND role = ? ORDER BY id DESC LIMIT 1)',
+                    (conversation_id, 'user')
+                )
             conn.commit()
         finally:
-            conn.close()
+            release_conn(conn)
