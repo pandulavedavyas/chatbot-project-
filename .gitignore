@@ -5,6 +5,7 @@ __pycache__/
 .env
 database.db
 dist/
+backend/static/
 .vscode/
 .idea/
 *.log
